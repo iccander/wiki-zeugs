@@ -37,10 +37,11 @@ $label = flip($lobid["preferredName"]);
 if (!empty($lobid["biographicalOrHistoricalInformation"][0])) $item['Dde'][0]=quote($lobid["biographicalOrHistoricalInformation"][0]);
 
 foreach($lobid["variantName"] as $alias) {
-	if (empty($item['Ade'])) {$item['Ade'][]=flip($alias);}
-    else {$item['Ade'][0].="|".flip($alias);}
+	// if (empty($item['Ade'])) {$item['Ade'][]=flip($alias);}
+    // else {$item['Ade'][0].="|".flip($alias);}
+	$item["Ade"][]=quote(flip($alias));
 }
-if (!empty($item['Ade'][0])) $item['Ade'][0]=quote($item['Ade'][0]);
+// if (!empty($item['Ade'][0])) { foreach} $item['Ade'][0]=quote($item['Ade'][0]);
 
 foreach($lobid["pseudonym"] as $pseudonym) {
 	if (!empty($pseudonym["label"])) $item['P742'][]=quote(flip($pseudonym["label"]));
