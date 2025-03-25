@@ -55,12 +55,7 @@ $label = flip($lobid["preferredName"]);
 
 if (!empty($lobid["biographicalOrHistoricalInformation"][0])) $item['Dde'][0]=quote($lobid["biographicalOrHistoricalInformation"][0]);
 
-foreach($lobid["variantName"] as $alias) {
-	// if (empty($item['Ade'])) {$item['Ade'][]=flip($alias);}
-    // else {$item['Ade'][0].="|".flip($alias);}
-	$item["Ade"][]=quote(flip($alias));
-}
-// if (!empty($item['Ade'][0])) { foreach} $item['Ade'][0]=quote($item['Ade'][0]);
+foreach($lobid["variantName"] as $alias) $item["Ade"][]=quote(flip($alias));
 
 foreach($lobid["pseudonym"] as $pseudonym) {
 	if (!empty($pseudonym["label"])) $item['P742'][]=quote(flip($pseudonym["label"]));
@@ -90,7 +85,6 @@ switch (substr(strrchr($lobid["gender"][0]["id"], "#"),1)){
     case 'male': $item['P21'][0]=$m;
         break;
     case 'female': $item['P21'][0]=$w;
-       // break;
 }
 // Lebensdaten
 $tag='T00:00:00Z/11';
@@ -102,7 +96,7 @@ if (!empty($lobid["dateOfDeath"][0])) {
 	if (strlen($lobid["dateOfDeath"][0])==4)  $item['P570'][0]='+'.$lobid["dateOfDeath"][0].$jahr;
 	if (strlen($lobid["dateOfDeath"][0])==10) $item['P570'][0]='+'.$lobid["dateOfDeath"][0].$tag;}
 
-// Wirkungsdaten bislang nur; 1880-1890; 1880
+// Wirkungsdaten bislang nur: 1880-1890; 1880
 // ohne Sonderfälle: ca. 1880-1890; 1880- usw.
 // https://lobid.org/gnd/1071745344, https://lobid.org/gnd/12891422X, 2x - https://lobid.org/gnd/135461710X
 if (strlen(trim($lobid["periodOfActivity"][0]))==4) {
@@ -191,7 +185,6 @@ foreach ($vornamen as $vorname){
 				break;
 			case 'Q12308941':  //männl. Vorname
 				$g--;
-			//	break;
 		}	
 	}
 }
