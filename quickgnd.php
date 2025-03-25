@@ -37,6 +37,7 @@ if(isset($_REQUEST['gnd'])) {
 	},
 	select: function(event, ui) {$('#id').val(ui.item.id.slice(ui.item.id.lastIndexOf('/')+1));}
 });</script>
+QuickStatements
 <?php
 if (isset($_REQUEST['gnd'])) $lobid=lobid($gnd); 
 if (!empty($lobid["type"][0])) { // wenn GND gültig/vorhanden
@@ -192,11 +193,16 @@ if ($g<0) $item['P21'][0]=$m; // kein Überschreiben, da nur größer
 if ($g>0) $item['P21'][0]=$w; // wenn einmal durchlaufen, d.h. unbelegt
 
 // Ausgabe der Statements
-
+				
+echo ' für GND <a href="https://lobid.org/gnd/'.$gnd.'" target="_blank" rel="noreferrer noopener">'.$gnd.'</a>';
 if (empty($qid)){
 	$qs="CREATE\n"; // wenn nicht in Wikidata, dann anlegen
 	$ref="LAST\t";   // Referenz auf neu angelegtes
-} else {$ref="{$qid}\t";} // oder auf Q-ID
+} else {
+	$ref="{$qid}\t"; // oder auf Q-ID
+	echo ' = <a href="https://www.wikidata.org/wiki/'.$qid.'" target="_blank" rel="noreferrer noopener">'.$qid.'</a>';
+} 
+echo ':';
 
 $qs.="{$ref}Lmul\t\"{$label}\"\n{$ref}Lde\t\"{$label}\"\n"; //mul: "Standard für alle Sprachen"
 if (empty($qid)) $qs.="{$ref}P31\tQ5\n"; // Mensch nur bei neuem Eintrag
@@ -233,8 +239,8 @@ foreach (array_keys($item) as $key) {
 		"Vorher bitte immer prüfen, ob es den Namenseintrag in Wikidata vielleicht schon gibt, ohne dass ihm bislang ein GND- oder VIAF-Eintrag zugeordnet ist. ".
 		"Ist dies der Fall, dann einfach in Wikidata die GND hinzufügen und eine halbe Minute warten. Danach erzeugt der Aufruf dieses Tools statt eines Neueintrags eine Ergänzung um die in der GND vorhandenen Elemente.\n\n". 
 		"Bei vorhandenem Wikidata-Eintrag werden bereits vorhandene Parameter (P1234 ...) von QuickStatements im Regelfall übrigens nicht überschrieben, sondern nur um die Quellenangabe (hier GND) ergänzt. ".
-		"Einzige Ausnahme: Label (Lde, Lmul), Beschreibung (Dde) und Alias (Ade) werden durch QS überschrieben. Hier ist also größte Vorsicht geboten und es sollten vorm Senden an QS die betreffenden Zeilen aus dem Textfeld gelöscht werden, wenn kein Überschreiben gewünscht ist!";
+		"Einzige Ausnahme: Label (Lde, Lmul) und Beschreibung (Dde) werden durch QS überschrieben. Hier ist also größte Vorsicht geboten und es sollten vorm Senden an QS die betreffenden Zeilen aus dem Textfeld gelöscht werden, wenn kein Überschreiben gewünscht ist!";
 }
 ?><form><textarea id='quickstatement' style="height:375px;width:800px;overflow:scroll;"><?php echo($qs); ?></textarea><br /><br />
 <a onclick="sendQS()" style="cursor: pointer;"><img src="https://upload.wikimedia.org/wikipedia/commons/b/bc/Plus_Wikidata.svg" height="50" alt="Wikidata-Plus" lang="en" loading="lazy"></a>
-</form></body></html>
+</form><br /><br />Quellcode auf <a href="https://github.com/iccander/wiki-zeugs/blob/main/quickgnd.php" target="_blank" rel="noreferrer noopener">GitHub</a>. Viel Spaß! F. Reichert</body></html>
