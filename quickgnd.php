@@ -26,7 +26,7 @@ if(isset($_REQUEST['gnd'])) {
 <br /><br /></form>QuickStatements
 <script>$('input.search-gnd').autocomplete({minLength:3,source : function(request, response) {
 $.ajax({url:"https://lobid.org/gnd/search",dataType:"jsonp",
-data:{size:19,q:request.term,format:"json:suggest"},success:function(data) {response(data);}});},
+data:{filter:"type:Person",size:20,q:request.term,format:"json:suggest"},success:function(data) {response(data);}});},
 select:function(event,ui) {$('#id').val(ui.item.id.slice(ui.item.id.lastIndexOf('/')+1));}});</script>
 <?php
 if (isset($_REQUEST['gnd'])) $lobid=lobid($gnd); 
