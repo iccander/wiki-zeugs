@@ -1,9 +1,11 @@
 <!DOCTYPE html>
-<html lang="de"><head><title>quickgnd</title><meta charset="utf-8">
+<html lang="de"><head><title>QuickGND</title><meta charset="utf-8">
 <meta name="description" content=""><meta name="author" content="FR">
 <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" type="text/css" href="https://tools-static.wmflabs.org/static/jquery-ui/1.11.1/jquery-ui.min.css">
 <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
+<script src="https://tools-static.wmflabs.org/static/jquery-ui/1.11.1/jquery-ui.min.js"></script>
 <script type="text/javascript" src="qs.js"></script></head><body><p>
 <img src="https://upload.wikimedia.org/wikipedia/commons/8/8e/Logo_Gemeinsame_Normdatei_%28GND%29.svg" width="50" height="50" alt="GND" lang="en" loading="lazy" align="middle">
 <img src="https://upload.wikimedia.org/wikipedia/commons/a/ac/Tabler-icons_arrow-big-right-lines-filled.svg" alt="=>" lang="en" loading="lazy" align="middle"> 
@@ -12,12 +14,29 @@
 <img src="https://upload.wikimedia.org/wikipedia/commons/6/66/Wikidata-logo-en.svg" height="50" alt="Wikidata" lang="en" loading="lazy" align="middle"></p>
 <?php 
 include_once 'queries.php';
-echo '<form action="'.htmlspecialchars($_SERVER["PHP_SELF"]).'" method="get"><b>GND:</b> &nbsp; <input type="text" name="gnd" style="width: 200px" value="'; 
-if(isset($_REQUEST['gnd'])) echo ($gnd=trim($_REQUEST['gnd']));
-?>
-"> &nbsp; 
-<input type="image" src="https://upload.wikimedia.org/wikipedia/commons/8/83/Wikidata-check.svg" height="45" alt="Submit" >
+echo '<form action="'.htmlspecialchars($_SERVER["PHP_SELF"]).'" method="GET">'; 
+echo '<input type="text" class="search-gnd" style="width:250px" placeholder="Namen in der GND suchen"/> &nbsp; ';
+echo '<input type="text" name="gnd" id="id" style="width: 100px" '; 
+if(isset($_REQUEST['gnd'])) {
+	echo 'value="'.($gnd=trim($_REQUEST['gnd'])).'">';} else 
+{
+	echo 'placeholder="GND">';
+} ?>
+&nbsp; <input type="image" src="https://upload.wikimedia.org/wikipedia/commons/8/83/Wikidata-check.svg" height="45" alt="Submit" >
 <br /><br /></form>
+<script>$('input.search-gnd').autocomplete({
+	source : function(request, response) {
+	$.ajax({
+		url : "https://lobid.org/gnd/search",
+		dataType : "jsonp",
+		data : {
+			q : request.term,
+			format : "json:preferredName,professionOrOccupation,*_dateOfBirth in_placeOfBirth,†_dateOfDeath in_placeOfDeath"},
+		success : function(data) {response(data);}
+		});
+	},
+	select: function(event, ui) {$('#id').val(ui.item.id.slice(ui.item.id.lastIndexOf('/')+1));}
+});</script>
 <?php
 if (isset($_REQUEST['gnd'])) $lobid=lobid($gnd); 
 if (!empty($lobid["type"][0])) { // wenn GND gültig/vorhanden
