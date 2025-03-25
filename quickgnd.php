@@ -23,21 +23,11 @@ if(isset($_REQUEST['gnd'])) {
 	echo 'placeholder="GND">';
 } ?>
 &nbsp; <input type="image" src="https://upload.wikimedia.org/wikipedia/commons/8/83/Wikidata-check.svg" height="45" alt="Submit" >
-<br /><br /></form>
-<script>$('input.search-gnd').autocomplete({
-	source : function(request, response) {
-	$.ajax({
-		url : "https://lobid.org/gnd/search",
-		dataType : "jsonp",
-		data : {
-			q : request.term,
-			format : "json:preferredName,professionOrOccupation,*_dateOfBirth in_placeOfBirth,†_dateOfDeath in_placeOfDeath"},
-		success : function(data) {response(data);}
-		});
-	},
-	select: function(event, ui) {$('#id').val(ui.item.id.slice(ui.item.id.lastIndexOf('/')+1));}
-});</script>
-QuickStatements
+<br /><br /></form>QuickStatements
+<script>$('input.search-gnd').autocomplete({minLength:3,source : function(request, response) {
+$.ajax({url:"https://lobid.org/gnd/search",dataType:"jsonp",
+data:{size:19,q:request.term,format:"json:suggest"},success:function(data) {response(data);}});},
+select:function(event,ui) {$('#id').val(ui.item.id.slice(ui.item.id.lastIndexOf('/')+1));}});</script>
 <?php
 if (isset($_REQUEST['gnd'])) $lobid=lobid($gnd); 
 if (!empty($lobid["type"][0])) { // wenn GND gültig/vorhanden
