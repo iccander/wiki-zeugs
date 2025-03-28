@@ -278,7 +278,7 @@ echo '<form><textarea id="quickstatement" style="height:350px;width:800px;overfl
 if (is_array($missing) && $missing) {
 	echo '<div style="font-family: sans-serif;">';
 	echo '<b style="color:Red;">Hinweis:</b> Wegen fehlender Wikidata-Zuordnung des GND-Identifikators nicht auflösbare Entitäten:<br />';
-	foreach ($missing as $mssng) echo ' &bull; <a target="_blank" rel="noreferrer noopener" href="'.$mssng.'">'.substr(strrchr($mssng,"/"),1).'</a>'; 
+	foreach (array_unique($missing) as $mssng) echo ' &bull; <a target="_blank" rel="noreferrer noopener" href="'.$mssng.'">'.substr(strrchr($mssng,"/"),1).'</a>'; 
 	echo ' --> Bitte erst in Wikidata zuordnen. Danke!'; 
 }
 ?> <br /><br />
