@@ -169,8 +169,8 @@ if (!empty($famname)) {
 }
 $g=0;  // Q-ID der Vornamen mit Geschlecht, Sortierung nach numerischem QID-Wert  
 if (is_array($vornamen) && $vornamen) foreach ($vornamen as $vorname){	// wenn Array > 0
-	$query='SELECT DISTINCT (STRAFTER(STR(?v),"y/") AS ?q) (SUBSTR(STR(?s),40) AS ?g) WHERE { VALUES ?s {wd:Q12308941 wd:Q11879590} 
-		?v rdfs:label "'.$vorname.'"@de; wdt:P31 ?s} ORDER BY (xsd:long(STRAFTER(STR(?v),"Q"))) LIMIT 1';
+	$query='SELECT (STRAFTER(STR(?v),"y/") AS ?q) (SUBSTR(STR(?s),40) AS ?g) WHERE { VALUES ?s {wd:Q12308941 wd:Q11879590} 
+		?v rdfs:label "'.$vorname.'"@de; wdt:P31 ?s} ORDER BY STRLEN(STR(?v)) ?v LIMIT 1';
 	$data =sparql($query);
 	$item['P735'][]=$data['q']['value'];
 	if (empty($item['P21'][0])) { // nur wenn in GND nicht belegt, was durchaus vorkommt
