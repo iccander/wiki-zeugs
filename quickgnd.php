@@ -142,25 +142,32 @@ foreach($lobid["languageCode"]as $spr){
 		}
 	}
 }
-// VIAF, ISNI und – ganz wichtig ! – Q-ID aus Lobid auslesen
+// VIAF, ISNI, ORCID und – ganz wichtig ! – Q-ID aus Lobid auslesen
 $item['P227'][0]=quote($gnd);
 foreach($lobid["sameAs"]as $ids ){
-	if (($viaf=strpos($ids["id"],'viaf.org')) !== false) {$item['P214'][0]=quote(substr($ids["id"],$viaf+14));} else {
-		if (($wiki=strpos($ids["id"],'wikidata.org')) !== false) {$qid=substr($ids["id"],$wiki+20);} else {
-			if (($isni=strpos($ids["id"],'isni.org')) !== false) {$item['P213'][0]=quote(substr($ids["id"],$isni+14));} else {
+	if (($pos=strpos($ids["id"],'viaf.org')) !== false) {$item['P214'][0]=quote(substr($ids["id"],$pos+14));} else {
+		if (($pos=strpos($ids["id"],'wikidata.org')) !== false) {$qid=substr($ids["id"],$pos+20);} else {
+			if (($pos=strpos($ids["id"],'isni.org')) !== false) {$item['P213'][0]=quote(substr($ids["id"],$pos+14));} else {
 				if ((strpos($ids["id"],'kalliope-verbund.info')) !== false) {$item['P9964'][0]=quote($gnd);} else {
 					if ((strpos($ids["id"],'deutsche-digitale-bibliothek.de')) !== false) {$item['P13049'][0]=quote($gnd);} else {
-						if ((strpos($ids["id"],'lagis-hessen')) !== false) {$item['P13226'][0]=quote($gnd);}
+						if ((strpos($ids["id"],'lagis-hessen')) !== false) {$item['P13226'][0]=quote($gnd);} else {
+							if (($pos=strpos($ids["id"],'orcid.org')) !== false) {$item['P496'][0]=quote(substr($ids["id"],$pos+10));}
+						}
 					}
 				}
 			}
 		}
 	}
-} 
+}
 
 // Wenn in Lobid keine Q-ID, dann in Wikidata über GND/VIAF suchen 
 if (empty($qid)) $qid=sparqlGND($gnd, $item['P214'][0]);
 
+// ORCID match
+if ((empty($qid)) AND (!empty($item['P496']))) {
+	$query='SELECT (STRAFTER(STR(?u),"y/") AS ?q) WHERE {?u wdt:P496 '.$item['P496'][0].'} LIMIT 1';
+	$qid=sparql($query)['q']['value'];
+}
 // Q-ID des Familiennamen - erstmal noch ohne Adelstitel "von"
 // es gibt auch Fälle, in denen es keinen Familiennamen hat
 if (!empty($famname)) {
