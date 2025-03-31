@@ -27,25 +27,26 @@ function sparqlGND($gnd,$viaf){
 	return sparql('SELECT DISTINCT (STRAFTER(STR(?u),"y/") AS ?q) WHERE {'.$query)['q']['value'];
 }
 function lookup($GND){
-	$Q='';		// 1.) in Lobid-Datensatz 
-	$result=lobid($GND);
+	$result=lobid($GND);	// 1.) in Lobid-Datensatz 
 	if (is_array($result["sameAs"]) && $result["sameAs"]) {
 		foreach($result["sameAs"] as $ids ){
 			if (($pos=strpos($ids["id"],'wikidata.org')) !== false) {
 				$Q=substr($ids["id"],$pos+20);
 				break;}
 			if (($pos=strpos($ids["id"],'viaf.org')) !== false) $viaf=quote(substr($ids["id"],$pos+14));
+			if (($pos=strpos($ids["id"],'sws.geonames.org')) !== false) $geoname=substr($ids["id"],$pos+17);
 		}
-	}             // 2.) alternativ in Wikidata 
-	if ($Q=='') $Q=sparqlGND($GND, $viaf);
-	if (($Q=='') or empty($Q)) {	// 3.) alternativ in Frankreich, USA 
+	}	// 2. Geografika ohne QID in Lobid via geonames.org matchen
+	if ((empty($Q)) AND (!empty($geoname))) $Q=sparql('SELECT (STRAFTER(STR(?u),"y/") AS ?q) WHERE {?u wdt:P1566 "'.$geoname.'"}')['q']['value'];
+	if (empty($Q)) $Q=sparqlGND($GND, $viaf); 	// 3.) QID alternativ aus Wikidata 
+	if (empty($Q)) {	// 4.) QID alternativ aus Frankreich & USA 
 		if (is_array($result["closeMatch"]) && $result["closeMatch"]) {
 			foreach($result["closeMatch"] as $ids ){
 				$auskunft='';
 				if (($pos=strpos($ids["id"],'data.bnf.fr/ark')) !== false) $ausk=jsonstring($ids["id"].".rdfjsonld");
 				if (($pos=strpos($ids["id"],'id.loc.gov/auth')) !== false) $ausk=jsonstring($ids["id"].".json");
-				if (preg_match('/wikidata\.org\/entity\/(Q\d+)/', $ausk, $treffer)) {
-					$Q=$treffer[1];
+				if (preg_match('/wikidata\.org\/entity\/(Q\d+)/',$ausk,$treffer)){
+					$Q=$treffer[1]; 	
 					break;
 				}
 			}
