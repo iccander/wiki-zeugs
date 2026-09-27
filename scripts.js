@@ -8,29 +8,30 @@ function sendQS(){
 }
 
 $('input.search-gnd').autocomplete({minLength:3,source : function(request, response) {
-$.ajax({url:"https://lobid.org/gnd/search",dataType:"jsonp",
-data:{filter:"type:Person",size:20,q:request.term,format:"json:suggest"},success:function(data) {response(data);}});},
+$.ajax({url:"proxy.php",dataType:"json",
+data:{url:"https://lobid.org/gnd/search",filter:"type:Person",size:20,q:request.term,format:"json:suggest"},success:function(data) {response(data);}});},
 select:function(event,ui) {$('#id').val(ui.item.id.slice(ui.item.id.lastIndexOf('/')+1));}});
 
 var liste = document.getElementById("wikidata");
 let output = document.getElementById("output");
 let textfeld = document.getElementById("quickstatement");
-let merker = output.innerHTML;
+let merker = output ? output.innerHTML : "";
 let last = "LAST";
-liste.addEventListener("change", showSelected);
+if (liste) liste.addEventListener("change", showSelected);
 function showSelected(evt) {
     var slValue = liste.value;
     var slId = liste.selectedIndex;
     var slText = liste.options[slId].text;
-    if (last === "LAST") {
+    if (last === "LAST" && textfeld) {
 		textfeld.value = textfeld.value.replace("CREATE\n", "");
 		textfeld.value = textfeld.value.replace("CREATE", "");
 	}
-	if (slValue === "LAST") {
+	if (slValue === "LAST" && textfeld) {
 		textfeld.value = "CREATE\n" + textfeld.value;
-		output.innerHTML = merker;
-	} else 
+		if (output) output.innerHTML = merker;
+	} else if (output) {
 		output.innerHTML = merker + " –&gt; <a href=\"https://www.wikidata.org/wiki/" + slValue + "\" target=\"_blank\" rel=\"noreferrer noopener\">" + slValue + "</a>";
-	textfeld.value = textfeld.value.replaceAll(last, slValue);
+	}
+	if (textfeld) textfeld.value = textfeld.value.replaceAll(last, slValue);
 	last = slValue;
 }

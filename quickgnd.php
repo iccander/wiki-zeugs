@@ -15,6 +15,7 @@
 <img src="https://upload.wikimedia.org/wikipedia/commons/6/66/Wikidata-logo-en.svg" height="50" alt="Wikidata" lang="en" loading="lazy" align="middle"></p>
 <?php 
 include_once 'queries.php';
+$missing = [];
 echo '<form action="'.htmlspecialchars($_SERVER["PHP_SELF"]).'" method="GET">';
 echo '<div style="float:left;margin-right:15px;">';
 echo '<label for="person">Person in GND</label>'; 
