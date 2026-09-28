@@ -2,7 +2,7 @@
 function quote($quote){return '"'.$quote.'"';
 } 
 function sparqlfeld($query){
-    $opts=['http'=>['method'=>'GET','header'=>["Accept: application/sparql-results+json\r\nUser-Agent: curl/7.79.1\r\n"],],];
+    $opts=['http'=>['method'=>'GET','header'=>["Accept: application/sparql-results+json\r\nUser-Agent: QuickGND/1.0 (+https://github.com/iccander/wiki-zeugs)\r\n"],],];
     $response=file_get_contents('https://query.wikidata.org/sparql?query='.urlencode($query),false,stream_context_create($opts));
 	if ($response === false) return [];
     return json_decode($response,true)['results']['bindings'] ?? [];
@@ -12,8 +12,9 @@ function sparql($query){
 }
 function jsonstring($URL){
 	$ch=curl_init($URL);
-	curl_setopt($ch,CURLOPT_USERAGENT,'User-Agent: curl/7.79.1');
+	curl_setopt($ch,CURLOPT_USERAGENT,'QuickGND/1.0 (+https://github.com/iccander/wiki-zeugs)');
 	curl_setopt($ch,CURLOPT_RETURNTRANSFER,true);
+	curl_setopt($ch,CURLOPT_TIMEOUT,30);
 	$response=curl_exec($ch);
 	curl_close($ch);
 	return $response;
