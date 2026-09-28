@@ -45,13 +45,14 @@ function flip(string $fullname): string
 $label = flip($lobid["preferredName"]);
 
 if (!empty($lobid["biographicalOrHistoricalInformation"][0])) $item['Dde'][0]=quote($lobid["biographicalOrHistoricalInformation"][0]);
+// Schleife! Bsp.: https://lobid.org/gnd/107830498X.json
 
 foreach($lobid["variantName"] as $alias) $item["Ade"][]=quote(flip($alias));
 
 foreach($lobid["pseudonym"] as $pseudonym) {
 	if (!empty($pseudonym["label"])) $item['P742'][]=quote(flip($pseudonym["label"]));
 }
-if (!empty($lobid["academicDegree"])) { 
+if (!empty($lobid["academicDegree"])) { // https://lobid.org/gnd/118803050.json 
 	if ((strpos($lobid["academicDegree"][0],'Prof.')) !== false) {$item['P512'][]="Q121594";}
 	if ((strpos($lobid["academicDegree"][0],'Dipl.-Ing.')) !== false) {$item['P512'][]="Q25929244";}
 	if ((strpos($lobid["academicDegree"][0],'Mag.')) !== false) {$item['P512'][]="Q1589434";}
@@ -104,23 +105,38 @@ $map=['placeOfBirth'=>'P19',
 'placeOfDeath'=>'P20',
 'placeOfActivity'=>'P937',
 'titleOfNobility'=>'P97',
-'professionOrOccupation'=>'P106',
-'fieldOfStudy'=>'P812',  
-'hasChild'=>'P40', 
+'professionOrOccupation'=>'P106', //z.B. https://lobid.org/gnd/13732569X
+'fieldOfStudy'=>'P812',  //z.B. https://lobid.org/gnd/1311448969
+'hasChild'=>'P40', // z.B. https://lobid.org/gnd/1136749489
 'hasSibling'=>'P3373',
-'hasAuntUncle'=>'P1038', 
+'hasAuntUncle'=>'P1038', // evt. noch + Q https://www.wikidata.org/wiki/Property:P1039
 'familialRelationship'=>'P1038',
 'hasSpouse'=>'P26',
 'hasParent'=>'P22', // => Vater (Mutter wäre P25)
 'professionalRelationship'=>'P1327',
-'acquaintanceshipOrFriendship'=>'P3342', 
+'acquaintanceshipOrFriendship'=>'P3342', // https://lobid.org/gnd/135461710X
 'affiliation'=>'P1416',
 'functionOrRole'=>'P39'];
 
-foreach (array_keys($map) as $key) {
-	foreach($lobid[$key] as $prop){
-		$i=lookup(substr(strrchr($prop["id"],"/"),1));
-		if (!empty($i)) {$item[$map[$key]][]=$i;} else {$missing[]=$prop["id"];}
+$gnds = [];  // gebündelte SPARQL-Abfrage, statt einzelne GNDs nacheinander abzufragen
+foreach (array_keys($map) as $key) {  // Aus lobid werden alle GNDs ausgelesen die in $map definiert werden
+	foreach (($lobid[$key] ?? []) as $prop) {
+		$lobidGND = substr(strrchr($prop["id"], "/"), 1);
+		$lobidGND && $gnds[$map[$key]][] = $lobidGND;
+	}
+}
+$allgnds = array_unique(array_merge(...(array_values($gnds) ?: [[]])));   // alle GNDs aus $gnds flachziehen
+$allgnds[] = $gnd; // zu eigener GND wird Qid in Wikidata gleich mit nachgeschlagen
+$table = sparqlfeld('SELECT DISTINCT (STRAFTER(STR(?u), "/entity/") AS ?qid) ?gnd WHERE { VALUES ?gnd { "'.implode('" "',$allgnds).'" } ?u p:P227 ?g . ?g ps:P227 ?gnd .}');
+$lookup = [];
+foreach ($table as $row) if (!empty($row['gnd']['value']) && !empty($row['qid']['value'])) {
+	$lookup[$row['gnd']['value']] = $row['qid']['value'];
+}
+foreach ($gnds as $property => $values) { // GNDs den jeweiligen Wikidata-Eigenschaften zuordnen
+	foreach ($values as $lobidGND) {
+		if (!empty($lookup[$lobidGND])) {
+			$item[$property][] = $lookup[$lobidGND];
+		} else $missing[] = $lobidGND;
 	}
 }
 // 1 Homepage
@@ -138,7 +154,7 @@ foreach($lobid["languageCode"]as $spr){
 			case 'fre': $item['P1412'][]="Q150"; 
 				break;
 			default: 
-				$query='SELECT DISTINCT (STRAFTER(STR(?u),"y/") AS ?q) WHERE {?u wdt:P219 "'.$iso.'"}';
+				$query='SELECT (STRAFTER(STR(?u),"y/") AS ?q) WHERE {?u wdt:P219 "'.$iso.'"}';
 				$item['P1412'][]=sparql($query)['q']['value'];
 		}
 	}
@@ -162,23 +178,24 @@ foreach($lobid["sameAs"]as $ids ){
 }
 
 // Wenn in Lobid keine Q-ID, dann in Wikidata über GND/VIAF suchen 
-if (empty($qid)) $qid=sparqlGND($gnd, $item['P214'][0]);
+if (empty($qid)) $qid = $lookup[$gnd];  // schon in Gesamtabruf mit nachgeschlagen!
+if (empty($qid)) $qid=sparqlGND($gnd, $item['P214'][0]);  // nur noch VIAF wirksam
 
 // ORCID match
 if ((empty($qid)) AND (!empty($item['P496']))) {
-	$query='SELECT (STRAFTER(STR(?u),"y/") AS ?q) WHERE {?u wdt:P496 '.$item['P496'][0].'} LIMIT 1';
+	$query='SELECT (STRAFTER(STR(?u),"y/") AS ?q) WHERE {?u wdt:P496 '.$item['P496'][0].'}';
 	$qid=sparql($query)['q']['value'];
 }
 // Q-ID des Familiennamen - erstmal noch ohne Adelstitel "von"
 // es gibt auch Fälle, in denen es keinen Familiennamen hat
 if (!empty($famname)) {
-	$query='SELECT DISTINCT (STRAFTER(STR(?u),"y/") AS ?q) WHERE {?u rdfs:label "'.$famname.'"@de; wdt:P31 ?s.?s (wdt:P279*) wd:Q101352} LIMIT 1';
+	$query='SELECT (STRAFTER(STR(?u),"y/") AS ?q) WHERE {?u rdfs:label "'.$famname.'"@de; wdt:P31 ?s.?s (wdt:P279*) wd:Q101352}';
 	$item['P734'][0]=sparql($query)['q']['value'];
 }
 $g=0;  // Q-ID der Vornamen mit Geschlecht, Sortierung nach numerischem QID-Wert  
 if (is_array($vornamen) && $vornamen) foreach ($vornamen as $vorname){	// wenn Array > 0
 	$query='SELECT (STRAFTER(STR(?v),"y/") AS ?q) (SUBSTR(STR(?s),40) AS ?g) WHERE { VALUES ?s {wd:Q12308941 wd:Q11879590} 
-		?v rdfs:label "'.$vorname.'"@de; wdt:P31 ?s} ORDER BY STRLEN(STR(?v)) ?v LIMIT 1';
+		?v rdfs:label "'.$vorname.'"@de; wdt:P31 ?s} ORDER BY STRLEN(STR(?v)) ?v';
 	$data =sparql($query);
 	$item['P735'][]=$data['q']['value'];
 	if (empty($item['P21'][0])) { // nur wenn in GND nicht belegt, was durchaus vorkommt
@@ -203,12 +220,7 @@ if (empty($qid)){
 	$query='SELECT DISTINCT (STRAFTER(STR(?item),"y/") AS ?q) ?itemLabel ?itemDescription 
 (GROUP_CONCAT(DISTINCT YEAR(?dob); SEPARATOR = "/") AS ?geb) 
 (GROUP_CONCAT(DISTINCT YEAR(?dod); SEPARATOR = "/") AS ?tod) WHERE {
-  VALUES ?such {
-    "'.$label.'"@de
-    "'.$label.'"@en
-    "'.$label.'"@fr
-    "'.$label.'"@mul
-    "'.$label.'"@it }
+ VALUES ?such {"'.$label.'"@de "'.$label.'"@en "'.$label.'"@fr "'.$label.'"@mul "'.$label.'"@it}
   { ?item wdt:P31 wd:Q5;
       (rdfs:label|skos:altLabel) ?such.
     OPTIONAL { ?item wdt:P569 ?dob. }
@@ -230,8 +242,8 @@ foreach ($data as $datb) {
 	// Wikidata-Daten in Datenfeld eintragen
 	echo '<div style="float:left;margin-right:10px;"><label for="wikidata">Wikidata</label>'; 
 	// --> Wikidata
-	$query='SELECT DISTINCT ?itemLabel ?itemDescription (YEAR(?dob) AS ?geb) (YEAR(?dod) AS ?tod) WHERE { VALUES ?item { wd:'.$qid.
-	' } OPTIONAL { ?item wdt:P569 ?dob. } OPTIONAL { ?item wdt:P570 ?dod. } SERVICE wikibase:label { bd:serviceParam wikibase:language "de,mul,en,fr,it". } }';
+	$query='SELECT ?itemLabel ?itemDescription (YEAR(?dob) AS ?geb) (YEAR(?dod) AS ?tod) WHERE { VALUES ?item { wd:'.$qid.
+	' } OPTIONAL { ?item wdt:P569 ?dob. } OPTIONAL { ?item wdt:P570 ?dod. } SERVICE wikibase:label {bd:serviceParam wikibase:language "de,mul,en,fr,it".}}';
 	$data =sparql($query);
 	$feld=$data['itemLabel']['value'].' | '.$data['geb']['value'].'-'.$data['tod']['value'].' | '.$data['itemDescription']['value'];
 	echo '<select type="text" id="wikidata" style="background-color:White;width:350px"><option value="">'.$feld.'</option></select></div>';
@@ -242,6 +254,11 @@ $qs.="{$ref}Lmul\t\"{$label}\"\n{$ref}Lde\t\"{$label}\"\n"; //mul: "Standard fü
 if (empty($qid)) $qs.="{$ref}P31\tQ5\n"; // Mensch nur bei neuem Eintrag
 
 $gndheute="\tS248\tQ36578\tS227\t\"{$gnd}\"\tS813\t+".date('Y-m-d').$tag."\n";
+
+foreach ($item as $prop => $vals) $item[$prop] = array_unique($vals);  // Dubletten innerhalb derselben Property
+// property-übergreifende Bereinigung von potentiell doppelten Verwandtenangaben
+$family = array_unique(array_merge($item['P22'] ?? [],$item['P25'] ?? [],$item['P40'] ?? [],$item['P3373'] ?? [],$item['P26'] ?? []));
+$item['P1038'] = array_values(array_diff($item['P1038'] ?? [], $family));
 
 foreach (array_keys($item) as $key) {
 	if (!empty($item[$key])) {
@@ -270,7 +287,7 @@ foreach (array_keys($item) as $key) {
 }	
 } else { // kein Parameter GND --> leere Startseite
 	$qs="Mit diesem Tool lassen sich Personendaten aus der GND via QuickStatements nach Wikidata portieren.\n\n".
-		"Ist die gesuchte oder direkt eingegebene GND (bzw. die korrespondierende VIAF) noch nicht in Wikidata vorhanden, wird eine Neuanlage für QuickStatements erzeugt. Ein Klick auf das große + schickt die Daten unmittelbar an QuickStatements.\n\n".
+		"Ist die gesuchte oder direkt eingegebene GND (bzw. eine korrespondierende VIAF- oder ORCID-ID) noch nicht in Wikidata vorhanden, wird eine Neuanlage für QuickStatements erzeugt. Ein Klick auf das große + schickt die Daten unmittelbar an QuickStatements.\n\n".
 		"Im Wikidata-Dropdown-Menü stehen Personen als mögliche Verknüpfungspartner zur Auswahl, die in Wikidata einen gleichen Namenseintrag haben und noch nicht mit einer GND verknüpft sind. Aufgelistet sind hier nur exakte Namensübereinstimmungen. Deshalb vorher trotzdem immer noch einmal prüfen, ob es den Namenseintrag in Wikidata vielleicht doch schon gibt! Ist dies der Fall, dann einfach in Wikidata die GND hinzufügen und eine halbe Minute warten. Danach erzeugt der Aufruf dieses Tools statt eines Neueintrags eine Ergänzung um die in der GND vorhandenen Elemente.\n\n". 
 		"Bei vorhandenem Wikidata-Eintrag werden bereits vorhandene Parameter (P1234 ...) von QuickStatements im Regelfall übrigens nicht überschrieben, sondern nur um die Quellenangabe (hier GND) ergänzt. ".
 		"Einzige Ausnahme: Label (Lde, Lmul) und Beschreibung (Dde) werden durch QuickStatements überschrieben. Hier ist also größte Vorsicht geboten und es sollten vorm Senden an QuickStatements die betreffenden Zeilen aus dem Textfeld gelöscht werden, wenn kein Überschreiben gewünscht ist!";
@@ -284,7 +301,7 @@ echo '<form><textarea id="quickstatement" style="height:350px;width:800px;overfl
 if (is_array($missing) && $missing) {
 	echo '<div style="font-family: sans-serif;">';
 	echo '<b style="color:Red;">Hinweis:</b> Wegen fehlender Wikidata-Zuordnung des GND-Identifikators nicht auflösbare Entitäten:<br />';
-	foreach (array_unique($missing) as $mssng) echo ' &bull; <a target="_blank" rel="noreferrer noopener" href="'.$mssng.'">'.substr(strrchr($mssng,"/"),1).'</a>'; 
+	foreach (array_unique($missing) as $mssng) echo ' &bull; <a target="_blank" href="https://d-nb.info/gnd/'.$mssng.'">'.$mssng.'</a>'; 
 	echo ' --> Bitte erst in Wikidata zuordnen. Danke!'; 
 }
 ?> <br /><br />
