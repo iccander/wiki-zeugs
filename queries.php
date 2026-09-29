@@ -12,9 +12,11 @@ function sparql($query){
 }
 function jsonstring($URL){
 	$ch=curl_init($URL);
-	curl_setopt($ch,CURLOPT_USERAGENT,'QuickGND/1.0 (+https://github.com/iccander/wiki-zeugs)');
-	curl_setopt($ch,CURLOPT_RETURNTRANSFER,true);
-	curl_setopt($ch,CURLOPT_TIMEOUT,30);
+	curl_setopt_array($ch,[
+		CURLOPT_USERAGENT => 'QuickGND/1.0 (+https://github.com/iccander/wiki-zeugs)',
+		CURLOPT_RETURNTRANSFER => true,
+		CURLOPT_TIMEOUT => 30,
+		CURLOPT_FOLLOWLOCATION => false]);
 	$response=curl_exec($ch);
 	curl_close($ch);
 	return $response;
