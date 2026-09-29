@@ -109,12 +109,21 @@ $map=['placeOfBirth'=>'P19',
 'hasAuntUncle'=>'P1038', // evt. noch + Q https://www.wikidata.org/wiki/Property:P1039
 'familialRelationship'=>'P1038',
 'hasSpouse'=>'P26',
-'hasParent'=>'ELTERN',
 'professionalRelationship'=>'P1327',
+'hasColleague'=>'P1327',  // same, https://d-nb.info/standards/elementset/agrelon#hasColleague
 'acquaintanceshipOrFriendship'=>'P3342', // https://lobid.org/gnd/135461710X
+'hasFriend'=>'P3342',  // same, https://d-nb.info/standards/elementset/agrelon#hasFriend
+'memberOfTheFamily'=>'P53',
+'relatedWork'=>'P800', // bedeutendes Werk (P800) = relevantes wissenschaftliches oder künstlerisches Werk des Subjekts
+'playedInstrument'=>'P1303',  // https://d-nb.info/standards/elementset/gnd#playedInstrument
 'affiliation'=>'P1416',
-'functionOrRole'=>'P39'];
-
+'relatedCorporateBody'=>'P1416', //same, https://d-nb.info/standards/elementset/gnd#relatedCorporateBody
+'functionOrRole'=>'P39',
+'hasTeacher'=>'P1066', // WD: student of, https://d-nb.info/standards/elementset/agrelon#hasTeacher 
+'hasStudent'=>'P802', // https://d-nb.info/standards/elementset/agrelon#hasStudent
+'functionOrRole'=>'P39',
+'hasParent'=>'ELTERN', // geschlechtsspezifische Behandlung erforderlich
+];
 $gnds = [];  // gebündelte SPARQL-Abfrage aller in $map definierten GNDs auf einmal
 foreach (array_keys($map) as $key) {
 	foreach (($lobid[$key] ?? []) as $prop) {
