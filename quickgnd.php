@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html lang="de"><head><title>QuickGND</title><meta charset="utf-8">
+<html lang="de"><head><title>QuickGND</title>
+<meta charset="utf-8">
 <meta name="description" content=""><meta name="author" content="FR">
-<meta http-equiv="Content-type" content="text/html; charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" type="text/css" href="https://tools-static.wmflabs.org/static/jquery-ui/1.11.1/jquery-ui.min.css">
 <script src="https://tools-static.wmflabs.org/cdnjs/ajax/libs/jquery/2.2.0/jquery.min.js"></script>
@@ -15,11 +15,11 @@
 <img src="https://upload.wikimedia.org/wikipedia/commons/6/66/Wikidata-logo-en.svg" height="50" alt="Wikidata" lang="en" loading="lazy" align="middle"></p>
 <?php 
 include_once 'queries.php';
-$missing = [];
+$missing = [];  $item=[]; $wirkung=[]; $qs='';
 echo '<form action="'.htmlspecialchars($_SERVER["PHP_SELF"]).'" method="GET">';
 echo '<div style="float:left;margin-right:15px;">';
 echo '<label for="person">Person in GND</label>'; 
-echo '<input type="text" id= "person" class="search-gnd" style="width:250px" placeholder="suchen"/></div>';
+echo '<input type="text" id="person" class="search-gnd" style="width:250px" placeholder="suchen"/></div>';
 echo '<div style="float:left;margin-right:15px;"><label for="id">GND-ID</label><input type="text" name="gnd" id="id" style="width: 80px" '; 
 if(isset($_REQUEST['gnd'])) {
 	echo 'value="'.($gnd=trim($_REQUEST['gnd'])).'">';
@@ -33,8 +33,8 @@ if (isset($_REQUEST['gnd'])) $lobid=lobid($gnd);
 if (!empty($lobid["type"][0])) { // wenn GND gültig/vorhanden
 
 // Auslesen spezieller Eigenschaften insb. Namen
-$vornamen=explode(' ',$lobid["preferredNameEntityForThePerson"]["forename"][0]);
-$famname=$lobid["preferredNameEntityForThePerson"]["surname"][0];
+$vornamen = preg_split('/\s+/', trim($lobid["preferredNameEntityForThePerson"]["forename"][0] ?? ''));
+$famname=$lobid["preferredNameEntityForThePerson"]["surname"][0] ?? '';
 
 function flip(string $fullname): string
     {   // Bsp.: "Schwerin, Johann Christoph Herrmann, Graf von"
@@ -47,58 +47,54 @@ $label = flip($lobid["preferredName"]);
 if (!empty($lobid["biographicalOrHistoricalInformation"][0])) $item['Dde'][0]=quote($lobid["biographicalOrHistoricalInformation"][0]);
 // Schleife! Bsp.: https://lobid.org/gnd/107830498X.json
 
-foreach($lobid["variantName"] as $alias) $item["Ade"][]=quote(flip($alias));
+foreach (($lobid["variantName"]??[]) as $alias) $item["Ade"][]=quote(flip($alias));
 
-foreach($lobid["pseudonym"] as $pseudonym) {
+foreach (($lobid["pseudonym"]??[]) as $pseudonym) {
 	if (!empty($pseudonym["label"])) $item['P742'][]=quote(flip($pseudonym["label"]));
 }
-if (!empty($lobid["academicDegree"])) { // https://lobid.org/gnd/118803050.json 
-	if ((strpos($lobid["academicDegree"][0],'Prof.')) !== false) {$item['P512'][]="Q121594";}
-	if ((strpos($lobid["academicDegree"][0],'Dipl.-Ing.')) !== false) {$item['P512'][]="Q25929244";}
-	if ((strpos($lobid["academicDegree"][0],'Mag.')) !== false) {$item['P512'][]="Q1589434";}
-	if ((strpos($lobid["academicDegree"][0],'Master')) !== false) {$item['P512'][]="Q183816";}
-	if ((strpos($lobid["academicDegree"][0],'Dr.')) !== false) {
-		$dr="Q4618975";
-		if ((strpos($lobid["academicDegree"][0],'med.')) !== false) $dr="Q913404";
-		if ((strpos($lobid["academicDegree"][0],'med. dent.')) !== false) $dr="Q12198834";
-		if ((strpos($lobid["academicDegree"][0],'rer. nat.')) !== false) $dr="Q503765";
-		if ((strpos($lobid["academicDegree"][0],'Ing.')) !== false) $dr="Q1253774";
-		if ((strpos($lobid["academicDegree"][0],'phil.')) !== false) $dr="Q46996674";
-		if ((strpos($lobid["academicDegree"][0],'iur.')) !== false) $dr="Q959320";
-		if ((strpos($lobid["academicDegree"][0],'jur.')) !== false) $dr="Q959320";
-		if ((strpos($lobid["academicDegree"][0],'agr.')) !== false) $dr="Q11408914";
-		$item['P512'][]=$dr;
-	}
+if (!empty($lobid["academicDegree"][0])) { // https://lobid.org/gnd/118803050.json  
+    $grad = $lobid["academicDegree"][0];
+    if (str_contains($grad,'Dipl.-Ing.')) $item['P512'][] = "Q25929244";
+    if (str_contains($grad,'Mag.')) $item['P512'][] = "Q1589434";
+    if (str_contains($grad,'Master')) $item['P512'][] = "Q183816";
+    if (str_contains($grad,'Dr.')) { 
+        $dr = "Q4618975"; 
+        if (str_contains($grad,'med. dent.')) $dr = "Q12198834"; 
+        elseif (str_contains($grad,'med.')) $dr = "Q913404"; 
+        if (str_contains($grad,'rer. nat.')) $dr = "Q503765"; 
+        if (str_contains($grad,'Ing.')) $dr = "Q1253774"; 
+        if (str_contains($grad,'phil.')) $dr = "Q46996674"; 
+        if (str_contains($grad,'iur.') || str_contains($grad,'jur.')) $dr = "Q959320"; 
+        if (str_contains($grad,'agr.')) $dr = "Q11408914"; 
+        $item['P512'][] = $dr; 
+    } 
 }
 // Geschlecht
 $m='Q6581097';
 $w='Q6581072';
-switch (substr(strrchr($lobid["gender"][0]["id"], "#"),1)){
+switch (substr(strrchr($lobid["gender"][0]["id"] ?? '', "#"),1)){
     case 'male': $item['P21'][0]=$m;
         break;
     case 'female': $item['P21'][0]=$w;
-       // break;
+        break;
 }
 // Lebensdaten
 $tag='T00:00:00Z/11';
 $jahr='-00-00T00:00:00Z/9';
-if (!empty($lobid["dateOfBirth"][0])) {
-	if (strlen($lobid["dateOfBirth"][0])==4)  $item['P569'][0]='+'.$lobid["dateOfBirth"][0].$jahr;
-	if (strlen($lobid["dateOfBirth"][0])==10) $item['P569'][0]='+'.$lobid["dateOfBirth"][0].$tag;}
-if (!empty($lobid["dateOfDeath"][0])) {
-	if (strlen($lobid["dateOfDeath"][0])==4)  $item['P570'][0]='+'.$lobid["dateOfDeath"][0].$jahr;
-	if (strlen($lobid["dateOfDeath"][0])==10) $item['P570'][0]='+'.$lobid["dateOfDeath"][0].$tag;}
-
-if (strlen(trim($lobid["periodOfActivity"][0]))==4) {
-	$item['P1317'][]='+'.trim($lobid["periodOfActivity"][0]).$jahr;} 
-else {
-	$wirkung = explode('-',$lobid["periodOfActivity"][0]);
+foreach (['dateOfBirth' => 'P569', 'dateOfDeath' => 'P570'] as $field => $prop) {
+    $len  = strlen($date = $lobid[$field][0] ?? '');
+    if ($len === 4)  $item[$prop][0] = '+' . $date . $jahr;
+    if ($len === 10) $item[$prop][0] = '+' . $date . $tag;
+}
+if (($period = trim($lobid["periodOfActivity"][0] ?? '')) !== '') {
+    strlen($period) === 4
+        ? $item['P1317'][]='+'.$period . $jahr
+        : $wirkung = preg_split('/\s*-\s*/', $period);
 }
 if (!empty($wirkung[1])) {
-	if (strlen(trim($wirkung[1]))==4) $item['P2032'][]='+'.trim($wirkung[1]).$jahr;
-	if (strlen(trim($wirkung[0]))==4) $item['P2031'][]='+'.trim($wirkung[0]).$jahr;
+	if (strlen($wirkung[1])===4) $item['P2032'][]='+'.$wirkung[1].$jahr;
+	if (strlen($wirkung[0])===4) $item['P2031'][]='+'.$wirkung[0].$jahr;
 }
-
 // Lobid-Kennung => Wikidata Property, mit GND-IDs --> z.B. $lobid["placeOfBirth"][0]["id"]
 // https://d-nb.info/standards/elementset/gnd#acquaintanceshipOrFriendship
 $map=['placeOfBirth'=>'P19',
@@ -159,7 +155,7 @@ foreach($lobid["languageCode"]as $spr){
 		}
 	}
 }
-// VIAF, ISNI, ORCID und – ganz wichtig ! – Q-ID aus Lobid auslesen
+// VIAF, ISNI, ORCID und Q-ID aus Lobid auslesen
 $item['P227'][0]=quote($gnd);
 foreach($lobid["sameAs"]as $ids ){
 	if (($pos=strpos($ids["id"],'viaf.org')) !== false) {$item['P214'][0]=quote(substr($ids["id"],$pos+14));} else {
@@ -216,7 +212,7 @@ if (empty($qid)){
 	$qs="CREATE\n"; // wenn nicht in Wikidata, dann anlegen
 	$ref="LAST\t";   // Referenz auf neu angelegtes
 	echo '<div style="float:left;margin-right:10px;"><label for="wikidata">Wikidata</label>';
-	echo '<select type="text" id="wikidata" style="background-color:White;width:350px"><option value="LAST">-- unverknüpfte Person auswählen --</option>';	
+	echo '<select id="wikidata" style="background-color:White;width:350px"><option value="LAST">-- unverknüpfte Person auswählen --</option>';	
 	$query='SELECT DISTINCT (STRAFTER(STR(?item),"y/") AS ?q) ?itemLabel ?itemDescription 
 (GROUP_CONCAT(DISTINCT YEAR(?dob); SEPARATOR = "/") AS ?geb) 
 (GROUP_CONCAT(DISTINCT YEAR(?dod); SEPARATOR = "/") AS ?tod) WHERE {
@@ -246,7 +242,7 @@ foreach ($data as $datb) {
 	' } OPTIONAL { ?item wdt:P569 ?dob. } OPTIONAL { ?item wdt:P570 ?dod. } SERVICE wikibase:label {bd:serviceParam wikibase:language "de,mul,en,fr,it".}}';
 	$data =sparql($query);
 	$feld=$data['itemLabel']['value'].' | '.$data['geb']['value'].'-'.$data['tod']['value'].' | '.$data['itemDescription']['value'];
-	echo '<select type="text" id="wikidata" style="background-color:White;width:350px"><option value="">'.$feld.'</option></select></div>';
+	echo '<select id="wikidata" style="background-color:White;width:350px"><option value="">'.$feld.'</option></select></div>';
 	} 
 echo "{$qslabel}</label>\n";
 
@@ -292,7 +288,7 @@ foreach (array_keys($item) as $key) {
 		"Bei vorhandenem Wikidata-Eintrag werden bereits vorhandene Parameter (P1234 ...) von QuickStatements im Regelfall übrigens nicht überschrieben, sondern nur um die Quellenangabe (hier GND) ergänzt. ".
 		"Einzige Ausnahme: Label (Lde, Lmul) und Beschreibung (Dde) werden durch QuickStatements überschrieben. Hier ist also größte Vorsicht geboten und es sollten vorm Senden an QuickStatements die betreffenden Zeilen aus dem Textfeld gelöscht werden, wenn kein Überschreiben gewünscht ist!";
 	echo '<div style="float:left;margin-right:10px;"><label for="wikidata" style="color:Gray;">Wikidata</label>'; 
-    echo '<select disabled type="text" id="wikidata" style="background-color:White;width:350px"><option value="">-- unverknüpfte Person auswählen --</option></select></div>';	
+    echo '<select disabled id="wikidata" style="background-color:White;width:350px"><option value="">-- unverknüpfte Person auswählen --</option></select></div>';	
 	echo '</form><br style="clear:both;" /><label for="quickstatement">QuickStatements</label>';
 } 
 //in jedem Fall auszuführender Code:
