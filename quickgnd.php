@@ -16,7 +16,7 @@
 <?php 
 include_once 'queries.php';
 $missing = [];  $item=[]; $wirkung=[]; $qs='';
-echo '<form action="'.htmlspecialchars($_SERVER["PHP_SELF"]).'" method="GET">';
+echo '<form action="'.htmlspecialchars($_SERVER["SCRIPT_NAME"]).'" method="GET">';
 echo '<div style="float:left;margin-right:15px;">';
 echo '<label for="person">Person in GND</label>'; 
 echo '<input type="text" id="person" class="search-gnd" style="width:250px" placeholder="suchen"/></div>';
@@ -33,8 +33,8 @@ if (isset($_REQUEST['gnd'])) $lobid=lobid($gnd);
 if (!empty($lobid["type"][0])) { // wenn GND gültig/vorhanden
 
 // Auslesen spezieller Eigenschaften insb. Namen
-$vornamen = preg_split('/\s+/', trim($lobid["preferredNameEntityForThePerson"]["forename"][0] ?? ''));
-$famname=$lobid["preferredNameEntityForThePerson"]["surname"][0] ?? '';
+$vornamen = preg_split('/\s+/', trim($lobid["preferredNameEntityForThePerson"]["forename"][0] ?? ''), -1, PREG_SPLIT_NO_EMPTY);
+$famname  = trim($lobid["preferredNameEntityForThePerson"]["surname"][0] ?? '');
 
 function flip(string $fullname): string
     {   // Bsp.: "Schwerin, Johann Christoph Herrmann, Graf von"
@@ -42,10 +42,11 @@ function flip(string $fullname): string
 			return str_replace(',','',substr($fullname,$p+2)).' '.substr($fullname,0,$p);}
 		else return $fullname; // wenn Name ohne Komma
     }
-$label = flip($lobid["preferredName"]);
+$label = flip($lobid["preferredName"] ?? '');
 
-if (!empty($lobid["biographicalOrHistoricalInformation"][0])) $item['Dde'][0]=quote($lobid["biographicalOrHistoricalInformation"][0]);
-// Schleife! Bsp.: https://lobid.org/gnd/107830498X.json
+if ($info = array_filter((array)($lobid["biographicalOrHistoricalInformation"] ?? [])))
+    $item['Dde'][0] = quote(implode(', ', $info));
+// Implode statt Schleife! Bsp.: https://lobid.org/gnd/107830498X.json
 
 foreach (($lobid["variantName"]??[]) as $alias) $item["Ade"][]=quote(flip($alias));
 
@@ -108,38 +109,43 @@ $map=['placeOfBirth'=>'P19',
 'hasAuntUncle'=>'P1038', // evt. noch + Q https://www.wikidata.org/wiki/Property:P1039
 'familialRelationship'=>'P1038',
 'hasSpouse'=>'P26',
-'hasParent'=>'P22', // => Vater (Mutter wäre P25)
+'hasParent'=>'ELTERN',
 'professionalRelationship'=>'P1327',
 'acquaintanceshipOrFriendship'=>'P3342', // https://lobid.org/gnd/135461710X
 'affiliation'=>'P1416',
 'functionOrRole'=>'P39'];
 
-$gnds = [];  // gebündelte SPARQL-Abfrage, statt einzelne GNDs nacheinander abzufragen
-foreach (array_keys($map) as $key) {  // Aus lobid werden alle GNDs ausgelesen die in $map definiert werden
+$gnds = [];  // gebündelte SPARQL-Abfrage aller in $map definierten GNDs auf einmal
+foreach (array_keys($map) as $key) {
 	foreach (($lobid[$key] ?? []) as $prop) {
 		$lobidGND = substr(strrchr($prop["id"], "/"), 1);
 		$lobidGND && $gnds[$map[$key]][] = $lobidGND;
 	}
 }
-$allgnds = array_unique(array_merge(...(array_values($gnds) ?: [[]])));   // alle GNDs aus $gnds flachziehen
-$allgnds[] = $gnd; // zu eigener GND wird Qid in Wikidata gleich mit nachgeschlagen
+$flatGnds = !empty($gnds) ? array_merge(...array_values($gnds)) : [];   // GNDs aus $gnds flachziehen
+$allgnds = array_unique([...$flatGnds, $gnd]); // Dubletten entfernen; Qid der eigenen GND in Wikidata gleich mit nachschlagen
 $table = sparqlfeld('SELECT DISTINCT (STRAFTER(STR(?u), "/entity/") AS ?qid) ?gnd WHERE { VALUES ?gnd { "'.implode('" "',$allgnds).'" } ?u p:P227 ?g . ?g ps:P227 ?gnd .}');
 $lookup = [];
 foreach ($table as $row) if (!empty($row['gnd']['value']) && !empty($row['qid']['value'])) {
 	$lookup[$row['gnd']['value']] = $row['qid']['value'];
 }
 foreach ($gnds as $property => $values) { // GNDs den jeweiligen Wikidata-Eigenschaften zuordnen
-	foreach ($values as $lobidGND) {
-		if (!empty($lookup[$lobidGND])) {
-			$item[$property][] = $lookup[$lobidGND];
-		} else $missing[] = $lobidGND;
+    foreach ($values as $lobidGND) {
+        if (!empty($lookup[$lobidGND])) { 
+            $targetQid = $lookup[$lobidGND];
+            if ($property === 'ELTERN') {
+                $g = sparql('SELECT (STRAFTER(STR(?sex), "y/") AS ?q) WHERE { wd:'.$targetQid.' wdt:P21 ?sex }')['q']['value'] ?? '';
+                $item[$g === $w ? 'P25' : 'P22'][] = $targetQid;  // Mutter oder Vater (Fallback)
+            } else $item[$property][] = $targetQid; 
+        } else $missing[] = $lobidGND;
 	}
 }
-// 1 Homepage
-if (!empty($lobid["homepage"][0]["id"])) $item['P973'][0]=quote($lobid["homepage"][0]["id"]);
+// Homepages
+$urls = array_column((array)($lobid['homepage'] ?? []), 'id');
+$item['P973'] = array_map('quote', array_filter($urls, 'is_string'));
 
 // Sprache
-foreach($lobid["languageCode"]as $spr){
+foreach(($lobid["languageCode"] ?? []) as $spr){
    if (($p=strpos($spr["id"],'iso639-2'))!==false){
 	   $iso=substr($spr["id"],$p+9);
 	   switch($iso){
@@ -155,9 +161,9 @@ foreach($lobid["languageCode"]as $spr){
 		}
 	}
 }
-// VIAF, ISNI, ORCID und Q-ID aus Lobid auslesen
+// VIAF, ISNI, ORCID und – ganz wichtig ! – Q-ID aus Lobid auslesen
 $item['P227'][0]=quote($gnd);
-foreach($lobid["sameAs"]as $ids ){
+foreach(($lobid["sameAs"] ?? []) as $ids ){
 	if (($pos=strpos($ids["id"],'viaf.org')) !== false) {$item['P214'][0]=quote(substr($ids["id"],$pos+14));} else {
 		if (($pos=strpos($ids["id"],'wikidata.org')) !== false) {$qid=substr($ids["id"],$pos+20);} else {
 			if (($pos=strpos($ids["id"],'isni.org')) !== false) {$item['P213'][0]=quote(substr($ids["id"],$pos+14));} else {
@@ -172,7 +178,6 @@ foreach($lobid["sameAs"]as $ids ){
 		}
 	}
 }
-
 // Wenn in Lobid keine Q-ID, dann in Wikidata über GND/VIAF suchen 
 if (empty($qid)) $qid = $lookup[$gnd];  // schon in Gesamtabruf mit nachgeschlagen!
 if (empty($qid)) $qid=sparqlGND($gnd, $item['P214'][0]);  // nur noch VIAF wirksam
