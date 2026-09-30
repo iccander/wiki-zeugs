@@ -15,17 +15,14 @@
 <img src="https://upload.wikimedia.org/wikipedia/commons/6/66/Wikidata-logo-en.svg" height="50" alt="Wikidata" lang="en" loading="lazy" align="middle"></p>
 <?php 
 include_once 'queries.php';
-$missing = [];  $item=[]; $wirkung=[]; $qs='';
+$missing=[]; $item=[]; $wirkung=[]; $qs='';
 echo '<form action="'.htmlspecialchars($_SERVER["SCRIPT_NAME"]).'" method="GET">';
 echo '<div style="float:left;margin-right:15px;">';
 echo '<label for="person">Person in GND</label>'; 
 echo '<input type="text" id="person" class="search-gnd" style="width:250px" placeholder="suchen"/></div>';
 echo '<div style="float:left;margin-right:15px;"><label for="id">GND-ID</label><input type="text" name="gnd" id="id" style="width: 80px" '; 
-if(isset($_REQUEST['gnd'])) {
-	echo 'value="'.($gnd=trim($_REQUEST['gnd'])).'">';
-} else {
-	echo 'placeholder="eingeben">';
-} ?>
+echo ($gnd=trim($_REQUEST['gnd'] ?? '')) ? 'value="'.$gnd.'">' : 'placeholder="eingeben">';
+?>
 </div>
 <input type="image" src="https://upload.wikimedia.org/wikipedia/commons/8/83/Wikidata-check.svg" height="45" alt="Submit" style="float:left;padding-top:15px;margin-right:35px;">
 <?php
@@ -71,8 +68,7 @@ if (!empty($lobid["academicDegree"][0])) { // https://lobid.org/gnd/118803050.js
     } 
 }
 // Geschlecht
-$m='Q6581097';
-$w='Q6581072';
+$m='Q6581097'; $w='Q6581072';
 switch (substr(strrchr($lobid["gender"][0]["id"] ?? '', "#"),1)){
     case 'male': $item['P21'][0]=$m;
         break;
@@ -98,32 +94,46 @@ if (!empty($wirkung[1])) {
 }
 // Lobid-Kennung => Wikidata Property, mit GND-IDs --> z.B. $lobid["placeOfBirth"][0]["id"]
 // https://d-nb.info/standards/elementset/gnd#acquaintanceshipOrFriendship
+$verwandte='P1038';
 $map=['placeOfBirth'=>'P19',
 'placeOfDeath'=>'P20',
 'placeOfActivity'=>'P937',
 'titleOfNobility'=>'P97',
 'professionOrOccupation'=>'P106', //z.B. https://lobid.org/gnd/13732569X
 'fieldOfStudy'=>'P812',  //z.B. https://lobid.org/gnd/1311448969
+'fieldOfActivity'=>'P101', 
 'hasChild'=>'P40', // z.B. https://lobid.org/gnd/1136749489
 'hasSibling'=>'P3373',
-'hasAuntUncle'=>'P1038', // evt. noch + Q https://www.wikidata.org/wiki/Property:P1039
-'familialRelationship'=>'P1038',
 'hasSpouse'=>'P26',
 'professionalRelationship'=>'P1327',
 'hasColleague'=>'P1327',  // same, https://d-nb.info/standards/elementset/agrelon#hasColleague
+'hasBusinessPartner'=>'P1327',
+'hasEmployer'=>'P108',
+'memberOf'=>'P463',
 'acquaintanceshipOrFriendship'=>'P3342', // https://lobid.org/gnd/135461710X
 'hasFriend'=>'P3342',  // same, https://d-nb.info/standards/elementset/agrelon#hasFriend
 'memberOfTheFamily'=>'P53',
 'relatedWork'=>'P800', // bedeutendes Werk (P800) = relevantes wissenschaftliches oder künstlerisches Werk des Subjekts
 'playedInstrument'=>'P1303',  // https://d-nb.info/standards/elementset/gnd#playedInstrument
-'affiliation'=>'P1416',
+'affiliation'=>'P463', // hier hatte ich usrspr. P1416, zu P463 (Mitglied von) 
+'hasAssociate'=>'P463',// geändert, da P1416 bei Wikidata-Personen selten genutzt wird.
 'relatedCorporateBody'=>'P1416', //same, https://d-nb.info/standards/elementset/gnd#relatedCorporateBody
 'functionOrRole'=>'P39',
 'hasTeacher'=>'P1066', // WD: student of, https://d-nb.info/standards/elementset/agrelon#hasTeacher 
 'hasStudent'=>'P802', // https://d-nb.info/standards/elementset/agrelon#hasStudent
 'functionOrRole'=>'P39',
-'hasParent'=>'ELTERN', // geschlechtsspezifische Behandlung erforderlich
+'hasParent'=>'ELTERN', //https://lobid.org/gnd/11871791X
+'hasAuntUncle'=>'ONKELTANTE', // Q in 'P1038' erforderlich --> $family;   https://www.wikidata.org/wiki/Property:P1039
+'hasGrandParent'=>'OMAOPA', // https://lobid.org/gnd/118842269.json
+'hasNieceNephew'=>'NICHTENEFFE',
+'hasGrandChild'=>'ENKEL',
+'familialRelationship'=>$verwandte // Sammelbecken nicht diversifizierter Familienangehöriger
 ];
+$familymap = ['OMAOPA' => [$m => 'Q9238344', $w => 'Q9235758'],
+    'ONKELTANTE' => [$m => 'Q76557',$w => 'Q76507'],
+    'ENKEL' => [$m => 'Q11921506',$w => 'Q19756330'],
+    'NICHTENEFFE' => [$m => 'Q15224724',$w => 'Q3403377']
+    ];
 $gnds = [];  // gebündelte SPARQL-Abfrage aller in $map definierten GNDs auf einmal
 foreach (array_keys($map) as $key) {
 	foreach (($lobid[$key] ?? []) as $prop) {
@@ -134,7 +144,7 @@ foreach (array_keys($map) as $key) {
 $flatGnds = !empty($gnds) ? array_merge(...array_values($gnds)) : [];   // GNDs aus $gnds flachziehen
 $allgnds = array_unique([...$flatGnds, $gnd]); // Dubletten entfernen; Qid der eigenen GND in Wikidata gleich mit nachschlagen
 $table = sparqlfeld('SELECT DISTINCT (STRAFTER(STR(?u), "/entity/") AS ?qid) ?gnd WHERE { VALUES ?gnd { "'.implode('" "',$allgnds).'" } ?u p:P227 ?g . ?g ps:P227 ?gnd .}');
-$lookup = [];
+$lookup=[];
 foreach ($table as $row) if (!empty($row['gnd']['value']) && !empty($row['qid']['value'])) {
 	$lookup[$row['gnd']['value']] = $row['qid']['value'];
 }
@@ -170,7 +180,7 @@ foreach(($lobid["languageCode"] ?? []) as $spr){
 		}
 	}
 }
-// VIAF, ISNI, ORCID und – ganz wichtig ! – Q-ID aus Lobid auslesen
+// VIAF, ISNI, ORCID und Q-ID aus Lobid auslesen
 $item['P227'][0]=quote($gnd);
 foreach(($lobid["sameAs"] ?? []) as $ids ){
 	if (($pos=strpos($ids["id"],'viaf.org')) !== false) {$item['P214'][0]=quote(substr($ids["id"],$pos+14));} else {
@@ -189,7 +199,7 @@ foreach(($lobid["sameAs"] ?? []) as $ids ){
 }
 // Wenn in Lobid keine Q-ID, dann in Wikidata über GND/VIAF suchen 
 if (empty($qid)) $qid = $lookup[$gnd];  // schon in Gesamtabruf mit nachgeschlagen!
-if (empty($qid)) $qid=sparqlGND($gnd, $item['P214'][0]);  // nur noch VIAF wirksam
+if (empty($qid)) $qid=sparqlGND($gnd, $item['P214'][0] ?? null);  // nur noch VIAF wirksam
 
 // ORCID match
 if ((empty($qid)) AND (!empty($item['P496']))) {
@@ -267,31 +277,39 @@ $gndheute="\tS248\tQ36578\tS227\t\"{$gnd}\"\tS813\t+".date('Y-m-d').$tag."\n";
 
 foreach ($item as $prop => $vals) $item[$prop] = array_unique($vals);  // Dubletten innerhalb derselben Property
 // property-übergreifende Bereinigung von potentiell doppelten Verwandtenangaben
-$family = array_unique(array_merge($item['P22'] ?? [],$item['P25'] ?? [],$item['P40'] ?? [],$item['P3373'] ?? [],$item['P26'] ?? []));
-$item['P1038'] = array_values(array_diff($item['P1038'] ?? [], $family));
+$family = array_unique(array_merge(
+    $item['P22'] ?? [],$item['P25'] ?? [],$item['P40'] ?? [],$item['P3373'] ?? [],$item['P26'] ?? [],
+    $item['OMAOPA'] ?? [],$item['ONKELTANTE'] ?? [],$item['NICHTENEFFE'] ?? [],$item['ENKEL'] ?? []));
+$item[$verwandte] = array_values(array_diff($item[$verwandte] ?? [], $family));
 
 foreach (array_keys($item) as $key) {
-	if (!empty($item[$key])) {
-		foreach ($item[$key] as $i) {
-			if (!empty($i)) {
-				// Ausgabe des Statements
-				$qs.= "{$ref}{$key}\t{$i}";
-				switch ($key){
-					// und der Quelle
-					case 'Dde':  // Beschr. dt.
-					case 'Ade':  // Alias dt.	
-					case 'P734': // Familienn.
-					case 'P735': // Vorn.
-						$qs.="\n"; // ohne Quellenangabe
-						break;
-					case 'P21': 
-						if ($g<>0) {$qs.="\tS887\tQ69652498\n";} // anh. Vornamen vermutetes Geschlecht
-						else {$qs.=$gndheute;} 
-						break;
-					case 'P3342': // ohne break + default
-						$qs.="\tP3831\tQ17297777"; // fungiert als: Freund
-					default: $qs.=$gndheute;}
-			}
+	if (empty($item[$key])) continue;
+	foreach ($item[$key] as $i) {
+		if (empty($i)) continue;
+		if (isset($familymap[$key])) { // Spezialfälle Verwandte P1038 mit P1039-Qualifikator
+			$sex = sparql('SELECT (STRAFTER(STR(?sex), "y/") AS ?q) WHERE { wd:'.$i.' wdt:P21 ?sex }')['q']['value'] ?? '';
+			$qs.= "{$ref}{$verwandte}\t{$i}";
+			if (!empty($familymap[$key][$sex])) $qs .= "\tP1039\t".$familymap[$key][$sex];
+			$qs .= $gndheute;
+			continue;
+		}
+		// Ausgabe des Statements
+		$qs.= "{$ref}{$key}\t{$i}";
+		switch ($key){
+			// und der Quelle
+			case 'Dde':  // Beschr. dt.
+			case 'Ade':  // Alias dt.	
+			case 'P734': // Familienn.
+			case 'P735': // Vorn.
+				$qs.="\n"; // ohne Quellenangabe
+				break;
+			case 'P21': 
+				if ($g<>0) {$qs.="\tS887\tQ69652498\n";} // anh. Vornamen vermutetes Geschlecht
+				else {$qs.=$gndheute;} 
+				break;
+			case 'P3342': // ohne break + default
+				$qs.="\tP3831\tQ17297777"; // fungiert als: Freund
+			default: $qs.=$gndheute;
 		}
 	}
 }	
